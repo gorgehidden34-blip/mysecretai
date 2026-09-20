@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MySecretAI</title>
+<style>
+:root{--bg:#090b10;--panel:#11151d;--panel2:#171c26;--text:#eef2ff;--muted:#8d96a8;--accent:#8b5cf6;--line:#252b38}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px system-ui,-apple-system,Segoe UI,sans-serif;height:100vh}
+.app{height:100vh;display:grid;grid-template-columns:270px 1fr}
+aside{background:#0d1016;border-right:1px solid var(--line);padding:16px;display:flex;flex-direction:column;gap:14px}
+.logo{font-size:21px;font-weight:800}.logo span{color:var(--accent)}
+button{border:0;border-radius:10px;padding:10px 13px;background:var(--accent);color:white;font-weight:650;cursor:pointer}
+button.secondary{background:var(--panel2);border:1px solid var(--line);color:var(--text)}
+button:hover{filter:brightness(1.1)}
+.new{width:100%}.chars{overflow:auto;display:flex;flex-direction:column;gap:7px}.char{display:flex;align-items:center;gap:10px;padding:10px;border-radius:10px;cursor:pointer}.char:hover,.char.active{background:var(--panel2)}
+.avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#8b5cf6,#22d3ee);display:grid;place-items:center;font-weight:800}
+.spacer{flex:1}.small{color:var(--muted);font-size:12px}
+main{display:flex;flex-direction:column;min-width:0}.top{height:64px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 22px;background:#0c0f15}
+.title{font-weight:750}.status{color:#67e8a5;font-size:12px}
+.messages{flex:1;overflow:auto;padding:28px;display:flex;flex-direction:column;gap:16px;max-width:950px;width:100%;margin:auto}
+.msg{max-width:75%;padding:13px 15px;border-radius:16px;line-height:1.5;white-space:pre-wrap}
+.bot{align-self:flex-start;background:var(--panel2);border:1px solid var(--line)}.user{align-self:flex-end;background:#6d45cf}
+.composer{padding:15px 22px;border-top:1px solid var(--line);background:#0c0f15}.row{max-width:950px;margin:auto;display:flex;gap:10px}
+textarea{flex:1;resize:none;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:14px;padding:13px;min-height:48px;max-height:150px;outline:none}
+.modal{position:fixed;inset:0;background:#0009;display:none;place-items:center;padding:20px}.modal.open{display:grid}.card{width:min(520px,100%);background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px}
+input{width:100%;background:#0b0e14;border:1px solid var(--line);color:var(--text);padding:11px;border-radius:10px;margin:7px 0 14px}
+.actions{display:flex;justify-content:flex-end;gap:8px}
+@media(max-width:700px){.app{grid-template-columns:1fr}aside{display:none}.messages{padding:18px}.msg{max-width:88%}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside>
+  <div class="logo">My<span>Secret</span>AI</div>
+  <button class="new" onclick="newChat()">＋ New Chat</button>
+  <div class="small">CHARACTERS</div>
+  <div id="chars" class="chars"></div>
+  <div class="spacer"></div>
+  <button class="secondary" onclick="openModal()">＋ Create Character</button>
+  <div class="small">Your chats stay in this browser for now.</div>
+</aside>
+<main>
+  <header class="top"><div><div id="charName" class="title">Nova</div><div class="status">● Ready</div></div><button class="secondary" onclick="clearChat()">Clear</button></header>
+  <section id="messages" class="messages"></section>
+  <div class="composer"><div class="row"><textarea id="input" placeholder="Message MySecretAI..." onkeydown="key(event)"></textarea><button onclick="send()">Send</button></div></div>
+</main>
+</div>
+
+<div id="modal" class="modal">
+ <div class="card">
+  <h2>Create a character</h2>
+  <label>Name</label><input id="cname" placeholder="e.g. Luna">
+  <label>Personality</label><input id="cpersonality" placeholder="Friendly, funny, helpful...">
+  <div class="actions"><button class="secondary" onclick="closeModal()">Cancel</button><button onclick="createCharacter()">Create</button></div>
+ </div>
+</div>
+
+<script>
+const KEY='mysa_v1';
+let state=JSON.parse(localStorage.getItem(KEY)||'null')||{
+ characters:[{name:'Nova',personality:'friendly, curious, helpful'}],
+ active:'Nova', chats:{Nova:[]}
+};
+function save(){localStorage.setItem(KEY,JSON.stringify(state))}
+function renderChars(){
+ const el=document.getElementById('chars'); el.innerHTML='';
+ state.characters.forEach(c=>{let d=document.createElement('div');d.className='char '+(c.name===state.active?'active':'');d.onclick=()=>select(c.name);
+ d.innerHTML=`<div class="avatar">${c.name[0].toUpperCase()}</div><div><b>${esc(c.name)}</b><div class="small">${esc(c.personality)}</div></div>`;el.appendChild(d)});
+}
+function select(name){state.active=name;state.chats[name]??=[];save();renderChars();render()}
+function render(){
+ document.getElementById('charName').textContent=state.active;
+ const box=document.getElementById('messages');box.innerHTML='';
+ let msgs=state.chats[state.active]||[];
+ if(!msgs.length) addMsg('bot',`Hi! I'm ${state.active}. This is your MySecretAI chat. The interface is working — next we'll connect a real AI model.`);
+ msgs.forEach(m=>addMsg(m.role==='user'?'user':'bot',m.text,false));
+ box.scrollTop=box.scrollHeight;
+}
+function addMsg(role,text,store=true){let box=document.getElementById('messages');let d=document.createElement('div');d.className='msg '+role;d.textContent=text;box.appendChild(d);if(store){state.chats[state.active].push({role,text});save()}box.scrollTop=box.scrollHeight}
+function send(){
+ let i=document.getElementById('input'),t=i.value.trim();if(!t)return;
+ addMsg('user',t);i.value='';
+ setTimeout(()=>addMsg('bot',`Demo response from ${state.active}.\n\nYour message was saved locally. The next step is connecting MySecretAI to a real free/open AI model.`),350);
+}
+function key(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}}
+function newChat(){state.chats[state.active]=[];save();render()}
+function clearChat(){newChat()}
+function openModal(){document.getElementById('modal').classList.add('open')}
+function closeModal(){document.getElementById('modal').classList.remove('open')}
+function createCharacter(){
+ let n=document.getElementById('cname').value.trim(),p=document.getElementById('cpersonality').value.trim()||'friendly, helpful';
+ if(!n)return;
+ if(!state.characters.some(x=>x.name===n)){state.characters.push({name:n,personality:p});state.chats[n]=[]}
+ state.active=n;save();renderChars();render();closeModal();
+ document.getElementById('cname').value='';document.getElementById('cpersonality').value='';
+}
+function esc(s){return String(s).replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[x]))}
+renderChars();render();
+</script>
+</body>
+</html>
